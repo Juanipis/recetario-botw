@@ -51,7 +51,8 @@ Los datos extraídos van a `gamedata/`, que git también ignora.
 ### Generar la app
 
 ```sh
-npm run dist:mac     # dist/mac-arm64/Recetario BotW.app (+ zips arm64/x64)
+npm run install:mac  # la genera para este Mac y la instala en /Applications
+npm run dist:mac     # dist/*-mac.zip (arm64 y x64)
 npm run dist:win     # dist/Recetario BotW-<v>-portable.exe y zip
 npm run dist:linux   # dist/*.AppImage y tar.gz
 ```

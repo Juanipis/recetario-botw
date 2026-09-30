@@ -21,11 +21,12 @@
     "icon": "python3 tools/make_icon.py",
     "start": "electron .",
     "test": "node tools/check-locales.mjs && node tests/cooking.test.mjs && node tests/savefile.test.mjs",
-    "dist:mac": "electron-builder --mac",
+    "dist:mac": "electron-builder --mac && node tools/clean-dist.mjs",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
-    "dist:all": "electron-builder --mac --win --linux",
-    "check-locales": "node tools/check-locales.mjs"
+    "dist:all": "electron-builder --mac --win --linux && node tools/clean-dist.mjs",
+    "check-locales": "node tools/check-locales.mjs",
+    "install:mac": "node tools/install-mac.mjs"
   },
   "devDependencies": {
     "electron": "^44.5.1",
@@ -51,12 +52,6 @@
     ],
     "mac": {
       "target": [
-        {
-          "target": "dir",
-          "arch": [
-            "arm64"
-          ]
-        },
         {
           "target": "zip",
           "arch": [

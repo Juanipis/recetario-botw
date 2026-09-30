@@ -53,7 +53,8 @@ The extracted data goes to `gamedata/`, which is ignored by git.
 ### Building the app
 
 ```sh
-npm run dist:mac     # dist/mac-arm64/Recetario BotW.app (+ arm64/x64 zips)
+npm run install:mac  # builds it for this Mac and installs it in /Applications
+npm run dist:mac     # dist/*-mac.zip (arm64 and x64)
 npm run dist:win     # dist/Recetario BotW-<v>-portable.exe and zip
 npm run dist:linux   # dist/*.AppImage and tar.gz
 ```
