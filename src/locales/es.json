@@ -133,5 +133,16 @@
   },
   "contribute": "¿Tu idioma no está? Añádelo en GitHub",
   "savePathHint": "La carpeta que contiene tu game_data.sav (o la de las ranuras 0, 1, 2…), o el archivo directamente.",
-  "switchUntested": "Switch (sin probar)"
+  "switchUntested": "Switch (sin probar)",
+  "whatItGives": "Qué da y cómo",
+  "mostHearts": "lo que más cura",
+  "mostValuable": "lo que más vale",
+  "notInInventory": "Con ingredientes que no llevas",
+  "effectFilter": "Filtrar por efecto",
+  "effectFilterAll": "Cualquier efecto",
+  "effectFilterNone": "Solo cura (sin efecto)",
+  "sortBy": "Ordenar",
+  "sortName": "Nombre",
+  "upTo": "hasta",
+  "computing": "Calculando…"
 }

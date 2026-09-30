@@ -9,6 +9,10 @@ Legend of Zelda: Breath of the Wild* y te dice qué puedes cocinar con lo que ll
   en el inventario del juego.
 - **La olla**: tocas ingredientes y ves al momento qué sale, con corazones,
   efecto, nivel, duración, precio de venta y lo que daría un crítico.
+- **Qué hace cada plato, de un vistazo**: cada tarjeta dice cuántos corazones
+  cura, su mejor precio y cada efecto que puede dar (con su icono y color, el mejor
+  nivel y la duración). Al abrirla ves **qué poner y cuántos** para conseguir cada
+  efecto, y puedes filtrar la lista por efecto.
 - **Recetas**: todas las del juego. Las que puedes hacer salen normales; las que
   harías con **un ingrediente más** salen apagadas, diciendo qué te falta. Los
   elixires tienen una tarjeta por efecto.

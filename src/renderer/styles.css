@@ -175,7 +175,7 @@ main { padding: 16px 18px 28px; display: grid; gap: 16px; }
 .focus-banner img { width: 26px; height: 26px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .card {
-  display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start;
   padding: 12px; border-radius: 14px; cursor: pointer;
   background: var(--panel-2); border: 1px solid var(--line);
   transition: transform .12s, border-color .12s, opacity .2s, filter .2s;
@@ -268,3 +268,48 @@ main { padding: 16px 18px 28px; display: grid; gap: 16px; }
   .top-row { grid-template-columns: 1fr; }
   .pot { position: static; }
 }
+
+/* ---------- effects at a glance ---------- */
+.fxchip {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; line-height: 1.5;
+  color: color-mix(in srgb, var(--fx) 78%, var(--text));
+  background: color-mix(in srgb, var(--fx) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fx) 42%, transparent);
+}
+.fxchip b { font-weight: 600; }
+.fxchip .fxicon { font-size: 12px; }
+.fxchip .fxdetail { color: var(--text); opacity: .85; }
+.fxchip .level { color: inherit; }
+.fxchip.more, .fxchip.plain { --fx: var(--muted); }
+.fx-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 6px; }
+.card-stats { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.card-stats .sep { color: var(--muted); }
+.card-body { min-width: 0; }
+.status .need-icons { display: inline-flex; vertical-align: middle; margin: 0 0 0 6px; }
+.status .need-icons img { width: 20px; height: 20px; }
+.slot .fx-badge {
+  position: absolute; left: 3px; top: 3px; font-size: 12px; line-height: 1;
+  padding: 2px 3px; border-radius: 7px; background: rgba(0, 0, 0, .45);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fx) 60%, transparent);
+}
+.select { padding: 6px 10px; border-radius: 9px; background: var(--slot); border: 1px solid var(--line); font-size: 12.5px; }
+.gives { display: grid; gap: 6px; }
+.give {
+  display: grid; grid-template-columns: minmax(230px, auto) 1fr auto; gap: 12px; align-items: center;
+  padding: 8px 10px; border-radius: 11px; background: var(--slot); border: 1px solid var(--line);
+}
+.give.lacking { opacity: .62; }
+.give.lacking:hover { opacity: 1; }
+.give-combo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ing.named { color: var(--text); font-size: 12.5px; gap: 4px; }
+.ing.named img { width: 28px; height: 28px; }
+.ing.named b { color: var(--accent); }
+.plus { color: var(--muted); }
+.fxchip.compact { padding: 1px 6px; gap: 3px; font-size: 11.5px; }
+.fxchip.compact .level { letter-spacing: -1.5px; margin-right: 1px; }
+.fxchip.compact .fxdetail { font-size: 11.5px; }
+.fx-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: -2px 0 12px; }
+.fxchip.legend { cursor: pointer; font: inherit; font-size: 12px; }
+.fxchip.legend:hover { background: color-mix(in srgb, var(--fx) 26%, transparent); }
+.fxchip.legend.on { background: var(--fx); color: #0b1417; border-color: transparent; font-weight: 600; }

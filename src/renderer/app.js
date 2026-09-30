@@ -13,6 +13,21 @@ const TAG_CATEGORY = {
 };
 const CATEGORY_ORDER = ['fruit', 'mushroom', 'plant', 'meat', 'fish', 'critter', 'monster', 'mineral', 'other', 'roast'];
 const EFFECT_ICON_KEY = { MovingSpeed: 'AllSpeed' };
+// symbol and color per effect, used on cards, the pot, variations and ingredients
+const EFFECT_STYLE = {
+  LifeMaxUp: { icon: '💛', color: '#f5c542' },
+  GutsRecover: { icon: '🟢', color: '#7fe07a' },
+  ExGutsMaxUp: { icon: '🟡', color: '#e8d25a' },
+  ResistHot: { icon: '❄️', color: '#86d4ff' },
+  ResistCold: { icon: '🌶️', color: '#ff8f45' },
+  ResistElectric: { icon: '⚡', color: '#f5de4a' },
+  Fireproof: { icon: '🔥', color: '#ff6a3d' },
+  MovingSpeed: { icon: '💨', color: '#6fe3c8' },
+  AttackUp: { icon: '⚔️', color: '#ff6b78' },
+  DefenseUp: { icon: '🛡️', color: '#80a8ff' },
+  Quietness: { icon: '🌙', color: '#b890ff' },
+};
+const EFFECT_ORDER = Object.keys(EFFECT_STYLE);
 // "francés" / "French"... in the app's language
 function languageName(code) {
   try {
@@ -39,6 +54,11 @@ const S = {
   focus: null,
   statuses: new Map(),
   cardActors: new Map(),
+  summaries: new Map(), // card id -> what it does with the current inventory
+  generic: new Map(), // card id -> what it does in general (independent of the save)
+  summaryRun: 0,
+  recipeEffect: 'all',
+  recipeSort: 'name',
   detail: null,
   settingsOpen: false,
 };
@@ -94,15 +114,10 @@ const levelMarks = (level, effect) => {
 
 function statsHtml(r, { crit = true } = {}) {
   const parts = [];
-  if (r.effect === 'LifeMaxUp') parts.push(`<span class="heart">❤ ${t('fullHeal')} + ${r.level} ${t('extraHearts')}</span>`);
+  if (r.effect === 'LifeMaxUp') parts.push(effectChip('LifeMaxUp', { extraHearts: r.level }));
   else if (r.hp > 0) parts.push(`<span class="heart" title="${r.hp / 4} ${t('hearts')}">❤ ${heartsText(r.hp)}</span>`);
   if (r.effect && r.effect !== 'None' && r.effect !== 'LifeMaxUp') {
-    let s = `<span class="effect-pill">${esc(effectName(r.effect))}</span>`;
-    if (r.level) s += levelMarks(r.level, r.effect);
-    if (r.time) s += ` <span>⏱ ${r.time}</span>`;
-    if (r.stamina !== undefined) s += ` <span>+${r.stamina} ${t('wheels')}</span>`;
-    if (r.staminaExtra !== undefined) s += ` <span>+${r.staminaExtra} ${t('wheels')}</span>`;
-    parts.push(`<span>${s}</span>`);
+    parts.push(effectChip(r.effect, { level: r.level, timeSec: r.timeSec, stamina: r.stamina ?? r.staminaExtra }));
   }
   parts.push(`<span class="rupee" title="${t('price')}">◈ ${r.price}</span>`);
   if (crit && r.crit && r.critRate) {
@@ -143,6 +158,7 @@ function setSave(save) {
     for (const { actor, qty } of save.items) if (S.data.ingredients[actor] && qty > 0) S.inv[actor] = (S.inv[actor] || 0) + qty;
   }
   S.statuses = new Map(S.planner.cards.map((c) => [c.id, S.planner.status(c, S.inv)]));
+  computeSummaries();
 }
 
 function buildCardActors() {
@@ -203,7 +219,10 @@ function renderInventory() {
   const q = norm(S.invSearch);
   const shown = owned.filter((a) => (S.invTab === 'all' || category(a) === S.invTab) && (!q || norm(itemName(a)).includes(q)));
   $('#inv-grid').innerHTML = shown.length
-    ? shown.map((a) => `<div class="slot ${S.focus === a ? 'focus' : ''}" data-action="add" data-actor="${a}" data-tip="${a}"><img src="${icon(a)}" alt="" loading="lazy"><span class="qty">${S.inv[a]}</span></div>`).join('')
+    ? shown.map((a) => {
+      const fx = EFFECT_STYLE[S.data.ingredients[a].effect];
+      return `<div class="slot ${S.focus === a ? 'focus' : ''}" data-action="add" data-actor="${a}" data-tip="${a}"><img src="${icon(a)}" alt="" loading="lazy">${fx ? `<span class="fx-badge" style="--fx:${fx.color}">${fx.icon}</span>` : ''}<span class="qty">${S.inv[a]}</span></div>`;
+    }).join('')
     : `<div class="empty">${S.save?.error ? t('noSaveTitle') : t('nothingHere')}</div>`;
 }
 
@@ -253,8 +272,10 @@ function renderRecipesShell() {
       <input class="search" id="recipe-search" type="search" placeholder="${t('searchRecipes')}" value="${esc(S.recipeSearch)}">
       <div class="seg" id="recipe-filter"></div>
       <div class="seg" id="recipe-kind"></div>
+      <select class="select" id="recipe-sort" title="${t('sortBy')}"></select>
       <span id="focus-banner"></span>
     </div>
+    <div class="fx-legend" id="recipe-effects"></div>
     <div class="cards" id="recipe-cards"></div>`;
 }
 
@@ -267,7 +288,21 @@ function visibleCards() {
     .filter((c) => S.statuses.get(c.id).missing <= maxMissing)
     .filter((c) => !S.focus || S.cardActors.get(c.id).has(S.focus))
     .filter((c) => !q || norm(dishName(c.dish, c.effect)).includes(q) || [...S.cardActors.get(c.id)].some((a) => norm(itemName(a)).includes(q)))
-    .sort((a, b) => S.statuses.get(a.id).missing - S.statuses.get(b.id).missing || dishName(a.dish, a.effect).localeCompare(dishName(b.dish, b.effect)));
+    .filter((c) => {
+      if (S.recipeEffect === 'all') return true;
+      const s = cardSummary(c);
+      if (!s) return true; // not computed yet
+      return S.recipeEffect === 'none' ? !Object.keys(s.effects).length : S.recipeEffect in s.effects;
+    })
+    .sort((a, b) => {
+      const byStatus = S.statuses.get(a.id).missing - S.statuses.get(b.id).missing;
+      const byName = dishName(a.dish, a.effect).localeCompare(dishName(b.dish, b.effect));
+      if (S.recipeSort === 'name') return byStatus || byName;
+      const sa = cardSummary(a);
+      const sb = cardSummary(b);
+      const metric = (s) => (!s ? -1 : S.recipeSort === 'hearts' ? s.hpMax + (s.effects.LifeMaxUp?.extraHearts || 0) * 4 : s.priceMax);
+      return byStatus || metric(sb) - metric(sa) || byName;
+    });
 }
 
 function renderRecipes() {
@@ -276,6 +311,13 @@ function renderRecipes() {
   };
   seg('#recipe-filter', 'filter', S.recipeFilter, [['canMake', t('filterCanMake')], ['missing1', t('filterMissing1')], ['all', t('filterAll')]]);
   seg('#recipe-kind', 'kind', S.recipeKind, [['all', t('kindAll')], ['food', t('kindFood')], ['elixir', t('kindElixir')]]);
+  const option = (v, cur, label) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(label)}</option>`;
+  const legend = (value, style, label) => `<button class="fxchip legend ${S.recipeEffect === value ? 'on' : ''}" style="--fx:${style}" data-action="fx-filter" data-value="${value}">${label}</button>`;
+  $('#recipe-effects').innerHTML = `<span class="hint">${t('effectFilter')}:</span>`
+    + legend('all', 'var(--accent)', t('effectFilterAll'))
+    + EFFECT_ORDER.map((e) => legend(e, EFFECT_STYLE[e].color, `<span class="fxicon">${EFFECT_STYLE[e].icon}</span>${esc(effectName(e))}`)).join('')
+    + legend('none', 'var(--muted)', t('effectFilterNone'));
+  $('#recipe-sort').innerHTML = [['name', t('sortName')], ['hearts', t('sortHearts')], ['price', t('sortPrice')]].map(([v, l]) => option(v, S.recipeSort, `${t('sortBy')}: ${l}`)).join('');
   $('#focus-banner').innerHTML = S.focus
     ? `<span class="focus-banner"><img src="${icon(S.focus)}" alt="">${t('usingIngredient')} ${esc(itemName(S.focus))}<button class="btn small ghost" data-action="clear-focus">✕</button></span>`
     : '';
@@ -289,19 +331,86 @@ function cardHtml(c) {
   const st = S.statuses.get(c.id);
   let status;
   if (st.missing === 0) {
-    status = `<div class="status ok">✓ ${t('canMake')}</div><div class="need-icons">${[...new Set(st.example)].map((a) => `<img src="${icon(a)}" alt="" data-tip="${a}">`).join('')}</div>`;
+    status = `<div class="status ok">✓ ${t('canMake')}<span class="need-icons">${[...new Set(st.example)].map((a) => `<img src="${icon(a)}" alt="" data-tip="${a}">`).join('')}</span></div>`;
   } else if (st.missing === 1) {
     const first = st.need[0];
-    status = `<div class="status m1">${t('missingOne')}: ${esc(itemName(first))}${st.need.length > 1 ? ` (+${st.need.length - 1})` : ''}</div>
-      <div class="need-icons">${st.need.slice(0, 8).map((a) => `<img src="${icon(a)}" alt="" data-tip="${a}">`).join('')}</div>`;
+    status = `<div class="status m1">${t('missingOne')}: ${esc(itemName(first))}${st.need.length > 1 ? ` (+${st.need.length - 1})` : ''}
+      <span class="need-icons">${st.need.slice(0, 6).map((a) => `<img src="${icon(a)}" alt="" data-tip="${a}">`).join('')}</span></div>`;
   } else {
     status = `<div class="status m2">${t('missingMany')}</div>`;
   }
   const cls = st.missing === 0 ? '' : st.missing === 1 ? 'missing1' : 'missing2';
   return `<div class="card ${cls}" data-action="open-card" data-card="${esc(c.id)}">
     <img src="${dishIcon(c.dish, c.effect)}" alt="" loading="lazy">
-    <div><h3>${esc(dishName(c.dish, c.effect))}</h3>${status}</div>
+    <div class="card-body"><h3>${esc(dishName(c.dish, c.effect))}</h3>
+      <div class="card-fx" data-fx="${esc(c.id)}">${summaryHtml(c)}</div>
+      ${status}</div>
   </div>`;
+}
+
+// what the card's dish does: owned summary if the player can make it, general otherwise
+function cardSummary(c) {
+  return S.statuses.get(c.id)?.missing === 0 ? S.summaries.get(c.id) : S.generic.get(c.id);
+}
+
+// "3× Mariposa chimenea + 1× Lagarto humero"
+function comboText(items) {
+  const counts = new Map();
+  for (const a of items) counts.set(a, (counts.get(a) || 0) + 1);
+  return [...counts].map(([a, n]) => `${n}× ${itemName(a)}`).join(' + ');
+}
+
+function effectChip(effect, info, { compact = false } = {}) {
+  const style = EFFECT_STYLE[effect] || { icon: '✦', color: 'var(--accent)' };
+  let detail = '';
+  if (effect === 'LifeMaxUp') detail = `+${info.extraHearts} ❤ ${t('extraHearts')}`;
+  else if (effect === 'GutsRecover' || effect === 'ExGutsMaxUp') detail = info.stamina ? `+${info.stamina} ${t('wheels')}` : '';
+  else {
+    if (info.level) detail += levelMarks(info.level, effect);
+    if (info.timeSec) detail += ` ⏱ ${Math.floor(info.timeSec / 60)}:${String(info.timeSec % 60).padStart(2, '0')}`;
+  }
+  if (compact && effect === 'LifeMaxUp') detail = `+${info.extraHearts} ❤`;
+  else if (compact && info.level) {
+    // cards: only the filled level marks and the time, the rest goes in the tooltip
+    const time = info.timeSec ? ` ${Math.floor(info.timeSec / 60)}:${String(info.timeSec % 60).padStart(2, '0')}` : '';
+    detail = `${maxLevel(effect) > 1 ? `<span class="level">${'◆'.repeat(info.level)}</span>` : ''}${time}`;
+  }
+  const numbers = [info.level ? `${t('level')} ${info.level}` : '', info.timeSec ? detail.split('⏱')[1]?.trim() : '', info.extraHearts ? `+${info.extraHearts} ❤` : '', info.stamina ? `+${info.stamina} ${t('wheels')}` : ''].filter(Boolean).join(' · ');
+  const tip = `${effectName(effect)}${numbers ? ` · ${numbers}` : ''}${info.items ? `\n${comboText(info.items)}` : ''}`;
+  return `<span class="fxchip ${compact ? 'compact' : ''}" style="--fx:${style.color}" title="${esc(tip)}"><span class="fxicon">${style.icon}</span>${compact ? '' : `<b>${esc(effectName(effect))}</b>`}${detail ? ` <span class="fxdetail">${detail}</span>` : ''}</span>`;
+}
+
+function summaryHtml(c) {
+  const s = cardSummary(c);
+  if (!s) return `<span class="hint">${t('computing')}</span>`;
+  const bits = [];
+  if (s.hpMax > 0) bits.push(`<span class="heart">❤ ${s.hpMin === s.hpMax ? heartsText(s.hpMax) : `${heartsText(s.hpMin)}–${heartsText(s.hpMax)}`}</span>`);
+  if (s.priceMax) bits.push(`<span class="rupee">◈ ${t('upTo')} ${s.priceMax}</span>`);
+  const effects = EFFECT_ORDER.filter((e) => s.effects[e]);
+  const chips = effects.map((e) => effectChip(e, s.effects[e], { compact: true }));
+  if (!effects.length) chips.push(`<span class="fxchip compact plain">${t('effectNone')}</span>`);
+  return `<div class="card-stats">${bits.join('<span class="sep">·</span>')}</div><div class="fx-chips">${chips.join('')}</div>`;
+}
+
+// summaries are computed in small chunks after each load so the window never freezes
+function computeSummaries() {
+  const run = ++S.summaryRun;
+  S.summaries = new Map();
+  const queue = [...S.planner.cards].sort((a, b) => S.statuses.get(a.id).missing - S.statuses.get(b.id).missing);
+  const step = () => {
+    if (run !== S.summaryRun) return; // a newer load started
+    const started = performance.now();
+    while (queue.length && performance.now() - started < 12) {
+      const c = queue.shift();
+      if (S.statuses.get(c.id).missing === 0) S.summaries.set(c.id, S.planner.summary(c, S.inv));
+      else if (!S.generic.has(c.id)) S.generic.set(c.id, S.planner.summary(c, S.planner.everything));
+      const el = document.querySelector(`[data-fx="${CSS.escape(c.id)}"]`);
+      if (el) el.innerHTML = summaryHtml(c);
+    }
+    if (queue.length) setTimeout(step, 0);
+    else if (S.recipeEffect !== 'all' || S.recipeSort !== 'name') renderRecipes();
+  };
+  setTimeout(step, 0);
 }
 
 // ---------------------------------------------------------------- detail
@@ -343,6 +452,42 @@ function requirementsHtml(card) {
   return `<div class="req">${variants.slice(0, 6).join('')}</div>`;
 }
 
+// "What it gives and how": per effect, the combination (with quantities) that gives the most of it
+function givesHtml(card) {
+  const canMake = S.statuses.get(card.id).missing === 0;
+  if (!S.generic.has(card.id)) S.generic.set(card.id, S.planner.summary(card, S.planner.everything));
+  const general = S.generic.get(card.id);
+  const mine = canMake ? S.summaries.get(card.id) || S.planner.summary(card, S.inv) : null;
+  const row = (label, info, lacking) => {
+    const missing = info.items.filter((a) => !S.inv[a]);
+    return `<div class="give ${lacking ? 'lacking' : ''}">
+      <div class="give-what">${label}</div>
+      <div class="give-combo">${comboNamesHtml(info.items, missing)}</div>
+      <button class="btn small" data-action="to-pot" data-items="${info.items.join(',')}">${t('toPot')}</button>
+    </div>`;
+  };
+  const rows = [];
+  const other = [];
+  for (const e of EFFECT_ORDER) {
+    if (mine?.effects[e]) rows.push(row(effectChip(e, mine.effects[e]), mine.effects[e], false));
+    else if (general.effects[e]) other.push(row(effectChip(e, general.effects[e]), general.effects[e], true));
+  }
+  const source = mine || general;
+  if (source.best.hearts?.hp > 0) rows.push(row(`<span class="heart">❤ ${heartsText(source.best.hearts.hp)}</span> <span class="hint">${t('mostHearts')}</span>`, source.best.hearts, !mine));
+  if (source.best.price) rows.push(row(`<span class="rupee">◈ ${source.best.price.price}</span> <span class="hint">${t('mostValuable')}</span>`, source.best.price, !mine));
+  if (!rows.length && !other.length) return '';
+  return `<h4>${t('whatItGives')}</h4><div class="gives">${rows.join('')}</div>
+    ${other.length ? `<div class="count-line">${t('notInInventory')}</div><div class="gives">${other.join('')}</div>` : ''}`;
+}
+
+function comboNamesHtml(items, missing = []) {
+  const counts = new Map();
+  for (const a of items) counts.set(a, (counts.get(a) || 0) + 1);
+  return [...counts]
+    .map(([a, n]) => `<span class="ing named ${missing.includes(a) ? 'lack' : ''}" data-tip="${a}"><img src="${icon(a)}" alt=""><b>${n}×</b> ${esc(itemName(a))}</span>`)
+    .join('<span class="plus">+</span>');
+}
+
 function variationRows(list) {
   return list
     .map((r) => `<div class="var ${r.missing.length ? 'missing' : ''}">
@@ -377,6 +522,7 @@ function renderDetail() {
           </div>
           <button class="btn ghost" data-action="close-modal" title="${t('close')}">✕</button>
         </div>
+        ${givesHtml(card)}
         <h4>${t('howToMake')}</h4>
         ${requirementsHtml(card)}
         <h4>${t('variations')}</h4>
@@ -532,6 +678,7 @@ function bindEvents() {
       case 'pot-remove': S.pot.splice(Number(el.dataset.index), 1); return renderPot();
       case 'pot-clear': S.pot = []; return renderPot();
       case 'filter': S.recipeFilter = el.dataset.value; return renderRecipes();
+      case 'fx-filter': S.recipeEffect = S.recipeEffect === el.dataset.value ? 'all' : el.dataset.value; return renderRecipes();
       case 'kind': S.recipeKind = el.dataset.value; return renderRecipes();
       case 'clear-focus': S.focus = null; renderInventory(); return renderRecipes();
       case 'open-card': return openDetail(el.dataset.card);
@@ -569,6 +716,10 @@ function bindEvents() {
     }
   });
   document.addEventListener('change', (e) => {
+    if (e.target.id === 'recipe-sort') {
+      S.recipeSort = e.target.value;
+      return renderRecipes();
+    }
     const key = e.target.dataset.setting;
     if (key) {
       const v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' || e.target.type === 'range' || key === 'maxVariations' ? Number(e.target.value) : e.target.value;
@@ -632,6 +783,7 @@ async function boot() {
 function runDemo(demo) {
   if (demo.filter) S.recipeFilter = demo.filter;
   if (demo.kind) S.recipeKind = demo.kind;
+  if (demo.effect) S.recipeEffect = demo.effect;
   if (demo.pot) S.pot = demo.pot;
   if (demo.focus) S.focus = demo.focus;
   renderAll();

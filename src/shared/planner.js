@@ -125,7 +125,7 @@ export class Planner {
    * mode 'owned': only what the inventory has (respecting quantities);
    * mode 'missing': exactly one ingredient the player lacks.
    */
-  variations(card, inv, { mode = 'owned', sort = 'price', max = 60 } = {}) {
+  variations(card, inv, { mode = 'owned', sort = 'price', max = 60, budget = LIMITS.evaluated } = {}) {
     const owned = (a) => (inv[a] || 0) > 0;
     const seen = new Map();
     let evaluated = 0;
@@ -139,7 +139,7 @@ export class Planner {
       return mode === 'owned' ? lacking === 0 : lacking === 1;
     };
     const tryCombo = (combo) => {
-      if (combo.length > MAX_INGREDIENTS || evaluated > LIMITS.evaluated) return;
+      if (combo.length > MAX_INGREDIENTS || evaluated > budget) return;
       const key = keyOf(combo);
       if (seen.has(key) || !fits(combo)) return;
       evaluated++;
@@ -157,7 +157,7 @@ export class Planner {
         .slice(0, LIMITS.extrasPool);
       let bases = 0;
       for (const base of product(lists)) {
-        if (++bases > LIMITS.baseCombos || evaluated > LIMITS.evaluated) break;
+        if (++bases > LIMITS.baseCombos || evaluated > budget) break;
         if (mode === 'missing' && base.filter((a) => !owned(a)).length !== 1) continue;
         const pool = [...new Set([...base.filter(owned), ...extras])];
         for (let add = 0; add <= MAX_INGREDIENTS - base.length; add++) {
@@ -177,7 +177,106 @@ export class Planner {
       fewer: (r) => -r.items.length * 1000 + r.price / 1000,
     }[sort] || ((r) => r.price);
     list.sort((a, b) => metric(b) - metric(a) || a.items.length - b.items.length);
-    return { total: list.length, list: list.slice(0, max), truncated: evaluated > LIMITS.evaluated };
+    return { total: list.length, list: list.slice(0, max), truncated: evaluated > budget };
+  }
+
+  /**
+   * What a dish does, for the recipe cards: range of hearts, best price and, per
+   * effect, the best level/duration/extra reachable. `inv` limits it to what the
+   * player carries; pass planner.everything for what the dish can give in general.
+   * Targeted rather than exhaustive: every candidate alone, then the pot filled
+   * with the strongest ingredient of each effect, the most healing and the most
+   * valuable one, which is where the maxima are.
+   */
+  summary(card, inv) {
+    const owned = (a) => (inv[a] || 0) > 0;
+    // best: { hearts, price } combos; effects[e] = the combo giving the most of e (with its numbers)
+    const out = { count: 0, hpMin: Infinity, hpMax: 0, priceMax: 0, effects: {}, plain: false, best: {} };
+    const seen = new Set();
+    // on ties prefer fewer and cheaper ingredients (do not burn rare monster parts for nothing)
+    const value = (items) => items.reduce((acc, a) => acc + (this.items[a].sell || 0), 0);
+    const fewer = (r, cur) => r.items.length < cur.items.length || (r.items.length === cur.items.length && value(r.items) < value(cur.items));
+    const add = (r) => {
+      out.count++;
+      if (!out.best.price || r.price > out.best.price.price || (r.price === out.best.price.price && fewer(r, out.best.price))) out.best.price = r;
+      out.priceMax = out.best.price.price;
+      if (r.effect === 'LifeMaxUp') {
+        const cur = out.effects.LifeMaxUp;
+        if (!cur || r.level > cur.extraHearts || (r.level === cur.extraHearts && fewer(r, cur))) {
+          out.effects.LifeMaxUp = { extraHearts: r.level, items: r.items, price: r.price };
+        }
+        return;
+      }
+      out.hpMin = Math.min(out.hpMin, r.hp);
+      if (!out.best.hearts || r.hp > out.best.hearts.hp || (r.hp === out.best.hearts.hp && fewer(r, out.best.hearts))) out.best.hearts = r;
+      out.hpMax = out.best.hearts.hp;
+      if (!r.effect || r.effect === 'None') {
+        out.plain = true;
+        return;
+      }
+      const e = { level: r.level || 0, timeSec: r.timeSec || 0, stamina: r.stamina ?? r.staminaExtra ?? 0, hp: r.hp, price: r.price, items: r.items };
+      const cur = out.effects[r.effect];
+      const rank = (x) => [x.level, x.timeSec, x.stamina, -x.items.length, -value(x.items)];
+      const better = !cur || rank(e).some((v, i) => v !== rank(cur)[i] && rank(e).slice(0, i).every((w, j) => w === rank(cur)[j]) && v > rank(cur)[i]);
+      if (better) out.effects[r.effect] = e;
+    };
+    const tryCombo = (combo) => {
+      const key = keyOf(combo);
+      if (seen.has(key) || combo.length > MAX_INGREDIENTS) return;
+      seen.add(key);
+      const count = {};
+      for (const a of combo) count[a] = (count[a] || 0) + 1;
+      if (Object.entries(count).some(([a, n]) => (inv[a] || 0) < n)) return;
+      const r = this.cooker.cook(combo);
+      if (this.producesCard(card, r)) add(r);
+    };
+    // fills the free slots with `actor` as far as the inventory allows
+    const fill = (base, actor) => {
+      const combo = [...base];
+      while (combo.length < MAX_INGREDIENTS && combo.filter((a) => a === actor).length < (inv[actor] || 0)) combo.push(actor);
+      return combo;
+    };
+    for (const recipe of card.recipes) {
+      const groups = this.groups(card, recipe);
+      const lists = groups.map((g) => g.options.filter(owned));
+      if (lists.some((l) => !l.length)) continue;
+      const candidates = [...new Set(lists.flat())];
+      const best = (score) => [...candidates].sort((a, b) => score(b) - score(a))[0];
+      const strongest = {};
+      for (const a of candidates) {
+        const e = this.items[a].effect;
+        if (e && e !== 'None' && (!strongest[e] || this.items[a].potency > this.items[strongest[e]].potency)) strongest[e] = a;
+      }
+      const fillers = [...new Set([...Object.values(strongest), best((a) => this.items[a].hp), best((a) => this.items[a].sell)])];
+      // greedy: the most valuable / most healing ingredients that fit, as many as owned
+      const greedy = (base, score) => {
+        const combo = [...base];
+        for (const a of [...candidates].sort((x, y) => score(y) - score(x))) {
+          while (combo.length < MAX_INGREDIENTS && combo.filter((c) => c === a).length < (inv[a] || 0)) combo.push(a);
+        }
+        return combo;
+      };
+      let n = 0;
+      for (const base of product(lists)) {
+        if (++n > LIMITS.baseCombos) break;
+        tryCombo(base);
+        tryCombo(greedy(base, (a) => this.items[a].sell));
+        tryCombo(greedy(base, (a) => this.items[a].hp));
+        if (groups.some((g) => g.single)) {
+          tryCombo(fill(base, base[0]));
+          continue;
+        }
+        for (const a of new Set([...base, ...fillers])) tryCombo(fill(base, a));
+      }
+    }
+    if (out.hpMin === Infinity) out.hpMin = 0;
+    return out;
+  }
+
+  // an inventory with 5 of every ingredient, for general summaries
+  get everything() {
+    this._everything ||= Object.fromEntries(Object.keys(this.items).map((a) => [a, MAX_INGREDIENTS]));
+    return this._everything;
   }
 
   usefulness(actor) {

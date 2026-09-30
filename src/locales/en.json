@@ -133,5 +133,16 @@
   },
   "contribute": "Your language is missing? Add it on GitHub",
   "savePathHint": "The folder that contains your game_data.sav (or the one with slots 0, 1, 2…), or the file itself.",
-  "switchUntested": "Switch (untested)"
+  "switchUntested": "Switch (untested)",
+  "whatItGives": "What it gives and how",
+  "mostHearts": "most healing",
+  "mostValuable": "most valuable",
+  "notInInventory": "With ingredients you don't carry",
+  "effectFilter": "Filter by effect",
+  "effectFilterAll": "Any effect",
+  "effectFilterNone": "Healing only (no effect)",
+  "sortBy": "Sort",
+  "sortName": "Name",
+  "upTo": "up to",
+  "computing": "Calculating…"
 }

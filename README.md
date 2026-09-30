@@ -10,6 +10,10 @@ carry.
   like the in-game inventory.
 - **The cooking pot**: click ingredients and see right away what comes out —
   hearts, effect, level, duration, selling price and what a critical cook gives.
+- **What each dish does, at a glance**: every card shows how many hearts it heals,
+  its best price and each effect it can give (with its own icon and color, best
+  level and duration). Open it to see **what to put in, and how many**, to get each
+  effect, and filter the list by effect.
 - **Recipes**: every recipe in the game. The ones you can make look normal; the
   ones you could make with **one more ingredient** are dimmed and tell you what
   is missing. Elixirs get one card per effect.
