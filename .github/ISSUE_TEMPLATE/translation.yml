@@ -1,0 +1,31 @@
+name: Translation / Traducción
+description: A new language or a fix to an existing one · Un idioma nuevo o una corrección
+labels: [translation]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language / Idioma
+      description: Name and ISO 639-1 code, e.g. "Português (pt)"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What / Qué
+      options:
+        - New language / Idioma nuevo
+        - Fix in an existing language / Corrección en un idioma existente
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details / Detalles
+      description: Keys or texts involved, or anything else · Claves o textos afectados, o lo que quieras contar
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Pull request
+      options:
+        - label: I will open a pull request with the translation (see CONTRIBUTING.md) · Abriré un pull request con la traducción

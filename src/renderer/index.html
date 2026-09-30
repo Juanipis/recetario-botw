@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; img-src 'self' app: data:; style-src 'self' app: 'unsafe-inline'; script-src 'self' app:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recetario BotW</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="topbar" class="topbar"></header>
+  <main id="main">
+    <section class="top-row">
+      <div id="inventory" class="panel inventory"></div>
+      <aside id="pot" class="panel pot"></aside>
+    </section>
+    <section id="recipes" class="panel recipes"></section>
+    <footer id="footer" class="footer"></footer>
+  </main>
+  <div id="modal-root"></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

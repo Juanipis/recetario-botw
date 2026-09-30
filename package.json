@@ -1,0 +1,116 @@
+{
+  "name": "recetario-botw",
+  "productName": "Recetario BotW",
+  "version": "0.1.0",
+  "description": "Lee tu partida de Zelda: Breath of the Wild y te muestra qué puedes cocinar con lo que llevas.",
+  "author": "Juan Pablo Diaz Correa",
+  "license": "MIT",
+  "homepage": "https://github.com/Juanipis/recetario-botw",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Juanipis/recetario-botw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Juanipis/recetario-botw/issues"
+  },
+  "type": "module",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "extract": "node tools/run-extract.mjs",
+    "icon": "python3 tools/make_icon.py",
+    "start": "electron .",
+    "test": "node tools/check-locales.mjs && node tests/cooking.test.mjs && node tests/savefile.test.mjs",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:all": "electron-builder --mac --win --linux",
+    "check-locales": "node tools/check-locales.mjs"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.juanipis.recetario-botw",
+    "productName": "Recetario BotW",
+    "copyright": "Juan Pablo Diaz Correa",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "gamedata",
+        "to": "gamedata"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "maintainer": "Juan Pablo Diaz",
+      "synopsis": "Qué puedes cocinar en BotW con lo que llevas"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+name: Bug / Error
+description: Something does not work as expected · Algo no funciona como esperabas
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / Qué pasó
+      description: And what you expected · Y qué esperabas
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System / Sistema
+      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Game version and region / Versión y región del juego
+      placeholder: Wii U, v208, USA
+  - type: textarea
+    id: recipe
+    attributes:
+      label: Ingredients involved (if it is a cooking result) / Ingredientes (si es un resultado de cocina)
+      description: What the app says vs. what the game gives · Lo que dice la app vs. lo que da el juego

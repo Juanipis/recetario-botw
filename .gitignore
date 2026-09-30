@@ -1,0 +1,9 @@
+node_modules/
+dist/
+# Nintendo's data, generated from your own copy of the game with `npm run extract`
+gamedata/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+extract.local.json
